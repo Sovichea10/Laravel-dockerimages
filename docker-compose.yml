@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  php:
+    image: laravel-fpm-nginx
+    container_name: fpm-nginx
+    restart: unless-stopped
+    command: ["sleep","infinity"]
+    networks:
+      - php
+networks:
+  php:
+    driver: bridge

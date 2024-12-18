@@ -1,0 +1,50 @@
+FROM php:8.2-rc-fpm-alpine
+
+# Install packages
+RUN apk update && apk upgrade
+
+RUN apk add --no-cache libaio libnsl \
+        libc6-compat curl $PHPIZE_DEPS \ 
+        libjpeg-turbo-dev \
+        freetype-dev \
+        libpng-dev \
+        libzip-dev 
+
+ADD https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0.zip /tmp/
+ADD https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-sdk-linux.x64-21.1.0.0.0.zip /tmp/
+ADD https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-sqlplus-linux.x64-21.1.0.0.0.zip /tmp/
+
+# Extract Oracle Client
+RUN unzip /tmp/instantclient-basic-linux.x64-*.zip -d /usr/local/ \
+    && unzip /tmp/instantclient-sdk-linux.x64-*.zip -d /usr/local/ \
+    && unzip /tmp/instantclient-sqlplus-linux.x64-*.zip -d /usr/local/
+
+# Link Oracle Client
+RUN ln -s /usr/local/instantclient_*_1 /usr/local/instantclient && \
+    ln -s /usr/local/instantclient/sqlplus /usr/bin/sqlplus && \
+    ln -s /usr/local/instantclient/libclntsh.so.21.1 /usr/lib/libclntsh.so && \
+    ln -s /usr/local/instantclient/libocci.so.21.1 /usr/lib/libocci.so && \
+    ln -s /usr/local/instantclient/libociicus.so /usr/lib/libociicus.so && \
+    ln -s /usr/local/instantclient/libnnz21.so /usr/lib/libnnz21.so && \
+    ln -s /usr/local/libnsl.so.2 /usr/lib/libnsl.so.1 && \
+    ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2 && \
+    ln -s /lib64/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2
+
+# Enable gd and zip extension
+RUN docker-php-ext-configure gd 
+RUN docker-php-ext-install zip
+
+# Enable and Install mysql extension
+RUN docker-php-ext-install pdo_mysql
+RUN docker-php-ext-enable pdo_mysql
+
+# Enable and Install Oci8 extension
+RUN docker-php-ext-configure oci8 --with-oci8=instantclient,/usr/local/instantclient
+RUN docker-php-ext-install oci8
+RUN mkdir /etc/ld.so.conf.d
+RUN echo /usr/local/instantclient/ > /etc/ld.so.conf.d/oracle-insantclient.conf 
+RUN echo "instantclient,/usr/local/instantclient_21_1" | pecl install oci8
+
+# Download Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
